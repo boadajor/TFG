@@ -1,0 +1,40 @@
+#######################################
+# Syntax Coloring Map For Ultrasound
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ADXL345	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+init	KEYWORD2
+powerOn	KEYWORD2
+readAccel	KEYWORD2
+get_Gxyz	KEYWORD2
+setRangeSetting	KEYWORD2
+set_bw	KEYWORD2
+setFullResBit	KEYWORD2
+
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+ADXL345_BW_1600	LITERAL1 
+ADXL345_BW_800	LITERAL1 
+ADXL345_BW_400	LITERAL1 
+ADXL345_BW_200	LITERAL1 
+ADXL345_BW_100	LITERAL1 
+ADXL345_BW_50	LITERAL1 
+ADXL345_BW_25	LITERAL1 
+ADXL345_BW_12	LITERAL1 
+ADXL345_BW_6 	LITERAL1 
+ADXL345_BW_3	LITERAL1 
+ADXL345_ADDR_ALT_HIGH	LITERAL1
+ADXL345_ADDR_ALT_LOW	LITERAL1
+
