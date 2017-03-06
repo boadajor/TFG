@@ -16,9 +16,9 @@
 
 #include <math.h>
 #include <stdlib.h>
-#define SILENCE 2000
+#define SILENCE 40
 #define F_DETECTION 3
-#define F_CONSTANT 350
+#define F_CONSTANT 16
 
 class signal{
 public:
