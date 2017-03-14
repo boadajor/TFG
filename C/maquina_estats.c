@@ -23,7 +23,7 @@ static void app_init(){ //inicialitzacio de variables
   setup_tmr0(ocr0a,8);
   serial_init();
   sei();
-  printf("%c\n", "a");
+  DDRB |= _BV(DDB5);
 }
 
 int main(void){
@@ -32,10 +32,12 @@ int main(void){
     printf("%d\n", input);
     if ((input>llindar_silenci) | (input<(-llindar_silenci))){
       // counter();
-      printf("%c\n", "M");
+      /* set pin 5 high to turn led on */
+      PORTB |= _BV(PORTB5);
     }
     else{
-      printf("%c\n", "m");
+      /* set pin 5 low to turn led off */
+      PORTB &= ~_BV(PORTB5);
     }
   }
   return 0;
