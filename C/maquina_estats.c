@@ -15,7 +15,7 @@ T_m=(OCR0A+1)/2 us
 static const uint8_t ocr0a=249; //per fer F_m=8kHz, T_m=125us
 static const int llindar_silenci = 28000; //valor maxim de senyal d'entrada considerat com a silenci
 uint8_t input=0; //valor llegit despres de l'ADC
-int segment[50]; //ultimes 50 mostres
+int segment[50]; //ultimes 50 mostres ->6.25ms
 uint32_t power=0; //potencia
 uint16_t sum=0; //sumatori de les ultimes 50 mostres
 
