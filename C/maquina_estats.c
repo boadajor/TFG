@@ -10,10 +10,14 @@ T_m=(OCR0A+1)/2 us
 #include <stdbool.h>
 #include "serial_device.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 static const uint8_t ocr0a=249; //per fer F_m=8kHz, T_m=125us
-static const int llindar_silenci = 128; //valor maxim de senyal d'entrada considerat com a silenci
-uint8_t input=0;
+static const int llindar_silenci = 28000; //valor maxim de senyal d'entrada considerat com a silenci
+uint8_t input=0; //valor llegit despres de l'ADC
+int segment[50]; //ultimes 50 mostres
+uint32_t power=0; //potencia
+uint16_t sum=0; //sumatori de les ultimes 50 mostres
 
 static int uart_putchar(char c, FILE *stream);
 static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL,_FDEV_SETUP_WRITE);
@@ -40,8 +44,10 @@ int main(void){
   stdout = &mystdout;
   app_init();
   while(true){
-    printf("%d\n", input);
-    if ((input>llindar_silenci) | (input<(-llindar_silenci))){
+    power=(sum*sum)/2; //calcul de la potencia
+    printf("%ld\n", power);
+    if (power>llindar_silenci) {
+    //if ((input>llindar_silenci) || (input<(-llindar_silenci))){
       // counter();
       /* set pin 5 high to turn led on */
       PORTB |= _BV(PORTB5);
@@ -55,6 +61,16 @@ int main(void){
 }
 
 ISR(TIMER0_COMPA_vect){
+  int i=49;
+  sum=0;
   start_ADC();
   input=read8_ADC();
+  while(i>0){
+    segment[i+1]=segment[i]; //desplaçament de mostres
+    sum+=abs(segment[i]); //sumatori de mostres
+    i-=1;
+  }
+  segment[1]=segment[0];
+  segment[0]=input;
+  sum+=abs(input);
 }
