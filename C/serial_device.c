@@ -12,10 +12,13 @@
  */
 void serial_init(void) {
   // set baud rate to 9600 bps. Ignore lower rates.
-  UBRR0H = BAUDRATE_H(9600);
+  /*UBRR0H = BAUDRATE_H(9600);
   UBRR0L = BAUDRATE_L(9600);
   // set normal baud rate 
-  UCSR0A = UINT8_C(0);
+  UCSR0A = UINT8_C(0);*/
+  //set baud rate 115200bps
+  UBRR0 = 16;
+  UCSR0A |= (1<<U2X0);
   UCSR0C = 
     (_BV(UCSZ01)   | _BV(UCSZ00)) &   // 8 bit frame
     ~_BV(UMSEL01) & ~_BV(UMSEL00) &   // asincronous mode

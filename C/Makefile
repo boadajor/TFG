@@ -2,7 +2,7 @@
 loadmain: maquina_estats.hex
 	avrdude -c arduino -p atmega328p -P /dev/ttyACM0 -U maquina_estats.hex
 	rm -f *~ *.hex osc
-	picocom /dev/ttyACM0
+	picocom -b115200 /dev/ttyACM0
 
 
 maquina_estats:  serial_device.c  serial_device.h tmr0.c tmr0.h adc.c adc.h maquina_estats.c

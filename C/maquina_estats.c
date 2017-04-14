@@ -11,6 +11,9 @@ T_m=(OCR0A+1)/2 us
 #include "serial_device.h"
 #include <stdio.h>
 #include <stdlib.h>
+#define MIDA 50 
+#define CONTINUA 128
+#define LLINDAR 28000
 
 typedef enum { //Estat de la maquina
   Data,
@@ -20,11 +23,10 @@ typedef enum { //Estat de la maquina
 } machine_state_t;
 
 static const uint8_t ocr0a=249; //per fer F_m=8kHz, T_m=125us
-static const int llindar_silenci = 28000; //valor maxim de senyal d'entrada considerat com a silenci
 uint8_t input=0; //valor llegit despres de l'ADC
-int segment[50]; // mida de la finestra. Ultimes 50 mostres ->6.25ms
-uint32_t power=0; //potencia
-uint8_t sum=0; //compta quants cops entrem a l'estat DATA
+uint8_t segment[MIDA]; // mida de la finestra. Ultimes 50 mostres ->6.25ms
+volatile int32_t power=0; //potencia
+uint8_t data_blocks=0; //compta quants cops entrem a l'estat DATA
 uint8_t counter=0;
 uint8_t index=0;//index de la cua circular
 
@@ -49,33 +51,35 @@ static void app_init(){ //inicialitzacio de variables
   serial_init();
   sei();
   DDRB |= _BV(DDB5);//pin 13 com a sortida per debuggar amb LED
+  DDRD |=(1<<DDD4);//pin 4 com a sortida per flag de debuggeig
 }
-
-static int calculs(){
-  uint32_t result=0;
+/*
+static int32_t calculs(){
+  int32_t result=0;
   int i=0;
-  while (i<51){
-    result+=((segment[i]*segment[i])/2);
+  while (i<=MIDA){
+    result+=(segment[i]*segment[i]);
+    //result+=abs(segment[i]);
     i+=1;
   }
+  //printf("el power val: %ld\n", result);
   return result; 
 }
-
+*/
 static void canvi_estat(){
-  power=calculs();
-  printf("el power val: %ld\n", power);
-  index=0;
   switch(estat){
   case Silence:
+    serial_put('0');
     counter=0;
     PORTB &= ~_BV(PORTB5);
-    if (power>llindar_silenci){
+    if (power>LLINDAR){
       counter+=1;
       estat=Isitdata;
     }
     break;
   case Isitdata:
-    if (power>llindar_silenci){
+    serial_put('+');
+    if (power>LLINDAR){
       if (counter<5)
 	counter+=1;
       else
@@ -87,20 +91,22 @@ static void canvi_estat(){
     }
     break;
   case Data:
-    sum+=1;
+    serial_put('1');
+    data_blocks+=1;
     counter=0;
     PORTB |= _BV(PORTB5);
-    if (power<llindar_silenci){
+    if (power<LLINDAR){
       counter+=1;
       estat=Isitsilence;
     }
     else{
       counter+=1;
-      printf("el counter val: %d\n", counter);
+      //printf("el counter val: %d\n", counter);
     }
     break;
   case Isitsilence:
-    if (power<llindar_silenci){
+    serial_put('-');
+    if (power<LLINDAR){
       if (counter<5)
 	counter+=1;
       else
@@ -111,25 +117,31 @@ static void canvi_estat(){
       estat=Isitdata;
     }
     break;
-  }
+    }
 }
   
 
 int main(void){
   stdout = &mystdout;
   app_init();
-  while(true){      
+  while(true){
+    
   }
   return 0;
 }
   
 ISR(TIMER0_COMPA_vect){
-  input=read8_ADC();  
+  PORTD |= (1<<PD4);
+  int8_t input=read8_ADC()-CONTINUA;  //pot donar problemes amb continua diferent de 127 -> solucio int16_t
+  //int16_t input=(int16_t)read8_ADC()-CONTINUA; //alternativa
   start_ADC();
-  segment[index]=input;
   index+=1;
-  if (index=50){
+  power+=(input*input);
+  if (index==MIDA){
+    //printf("%ld\n", power);
     canvi_estat();
     index=0;
+    power=0;
   }
+  PORTD &= ~(1<<PD4);
 }
