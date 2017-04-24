@@ -14,23 +14,35 @@ T_m=(OCR0A+1)/2 us
 #define MIDA 50 
 #define CONTINUA 128
 #define LLINDAR 28000
+#define VALIDBLOCK 80 //80 mostres de sorol = 500ms de soroll
+#define SHORTPAUSE 80
+#define LONGPAUSE 160
 
-typedef enum { //Estat de la maquina
+typedef enum { //Estat de la maquina detectora de senyal
   Data,
   Silence,
   Isitdata,
   Isitsilence,
 } machine_state_t;
 
+typedef enum { //Estat de la maquina detectora de senyal
+  Pause,
+  Block,
+  Action,
+} state_t;
+
 static const uint8_t ocr0a=249; //per fer F_m=8kHz, T_m=125us
 uint8_t input=0; //valor llegit despres de l'ADC
 uint8_t segment[MIDA]; // mida de la finestra. Ultimes 50 mostres ->6.25ms
 volatile int32_t power=0; //potencia
 uint8_t data_blocks=0; //compta quants cops entrem a l'estat DATA
-uint8_t counter=0;
+uint8_t ncounter=0; //quantitat de mostres en senyal
+uint8_t scounter=0; //quantitat de mostres en silenci
 uint8_t index=0;//index de la cua circular
+bool estataux=false;
 
 machine_state_t estat=Silence;
+state_t state=Pause;
 
 static int uart_putchar(char c, FILE *stream);
 static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL,_FDEV_SETUP_WRITE);
@@ -52,68 +64,67 @@ static void app_init(){ //inicialitzacio de variables
   sei();
   DDRB |= _BV(DDB5);//pin 13 com a sortida per debuggar amb LED
   DDRD |=(1<<DDD4);//pin 4 com a sortida per flag de debuggeig
+  DDRD |=(1<<DDD5);
+  DDRD |=(1<<DDD6);
+  DDRD |=(1<<DDD7);
 }
-/*
-static int32_t calculs(){
-  int32_t result=0;
-  int i=0;
-  while (i<=MIDA){
-    result+=(segment[i]*segment[i]);
-    //result+=abs(segment[i]);
-    i+=1;
-  }
-  //printf("el power val: %ld\n", result);
-  return result; 
-}
-*/
+
 static void canvi_estat(){
   switch(estat){
   case Silence:
+    estataux=false;
     serial_put('0');
-    counter=0;
+    ncounter=0;
     PORTB &= ~_BV(PORTB5);
     if (power>LLINDAR){
-      counter+=1;
+      ncounter=1;
       estat=Isitdata;
     }
+    else
+      scounter+=1;
     break;
   case Isitdata:
     serial_put('+');
     if (power>LLINDAR){
-      if (counter<5)
-	counter+=1;
-      else
+      if (ncounter<5)
+	ncounter+=1;
+      else{
+	ncounter+=1;
 	estat=Data;
+      }
     }
     else{
-      counter=1;
+      scounter+=1;
       estat=Isitsilence;
     }
     break;
   case Data:
+    estataux=true;
     serial_put('1');
     data_blocks+=1;
-    counter=0;
+    scounter=0;
     PORTB |= _BV(PORTB5);
     if (power<LLINDAR){
-      counter+=1;
+      scounter=1;
       estat=Isitsilence;
     }
     else{
-      counter+=1;
+      ncounter+=1;
       //printf("el counter val: %d\n", counter);
     }
     break;
   case Isitsilence:
     serial_put('-');
     if (power<LLINDAR){
-      if (counter<5)
-	counter+=1;
-      else
+      if (scounter<5)
+	scounter+=1;
+      else{
+	scounter+=1;
 	estat=Silence;
+      }
     }
     else{
-      counter=1;
+      ncounter=1;
       estat=Isitdata;
     }
     break;
@@ -124,12 +135,50 @@ static void canvi_estat(){
 int main(void){
   stdout = &mystdout;
   app_init();
+  uint8_t blockcount=0;
   while(true){
-    
-  }
+    switch(state) {
+    case Pause:
+      if (estataux==true){
+	if (ncounter>=VALIDBLOCK)
+	  state=Block;
+      }
+      else{
+	if (scounter>=LONGPAUSE)
+	  state=Action;
+      }
+      break;
+    case Block:
+      blockcount+=1;
+	if (scounter>=SHORTPAUSE)
+	  state=Pause;
+      break;
+    case Action:
+      switch(blockcount) {
+      case 1:
+	//OK
+	PORTD |= _BV(PORTD5);
+	break;
+      case 2:
+	//Llanterna
+	PORTD |= _BV(PORTD6);
+	break;
+      case 3:
+	//Radio
+	PORTD |= _BV(PORTD7);
+	break;
+      default:
+	//SOS
+	break;
+	blockcount=0;
+	state=Pause;
+      }
+      break;
+    }
+  } 
   return 0;
 }
-  
+
 ISR(TIMER0_COMPA_vect){
   PORTD |= (1<<PD4);
   int8_t input=read8_ADC()-CONTINUA;  //pot donar problemes amb continua diferent de 127 -> solucio int16_t
