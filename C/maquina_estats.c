@@ -26,23 +26,26 @@ typedef enum { //Estat de la maquina detectora de senyal
 } machine_state_t;
 
 typedef enum { //Estat de la maquina detectora de senyal
-  Pause,
+  Inicial,
+  Primersilenci,
   Block,
-  Action,
+  Segonsilenci
 } state_t;
 
 static const uint8_t ocr0a=249; //per fer F_m=8kHz, T_m=125us
 uint8_t input=0; //valor llegit despres de l'ADC
 uint8_t segment[MIDA]; // mida de la finestra. Ultimes 50 mostres ->6.25ms
 volatile int32_t power=0; //potencia
-uint8_t data_blocks=0; //compta quants cops entrem a l'estat DATA
-uint8_t ncounter=0; //quantitat de mostres en senyal
-uint8_t scounter=0; //quantitat de mostres en silenci
+volatile int32_t power_copy=0; //potencia
+uint8_t ncounter=0; //controla la transicio d'estats de la maquina 1
+uint8_t scounter=0; //controla la transicio d'estats de la maquina 1
 uint8_t index=0;//index de la cua circular
-bool estataux=false;
+bool flag_int=false;
+bool flag_silenci=false;
+bool flag_data=false;
 
 machine_state_t estat=Silence;
-state_t state=Pause;
+state_t state=Inicial;
 
 static int uart_putchar(char c, FILE *stream);
 static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL,_FDEV_SETUP_WRITE);
@@ -70,112 +73,74 @@ static void app_init(){ //inicialitzacio de variables
 }
 
 static void canvi_estat(){
-  switch(estat){
-  case Silence:
-    estataux=false;
-    serial_put('0');
-    ncounter=0;
-    PORTB &= ~_BV(PORTB5);
-    if (power>LLINDAR){
-      ncounter=1;
-      estat=Isitdata;
-    }
-    else
-      scounter+=1;
-    break;
-  case Isitdata:
-    serial_put('+');
-    if (power>LLINDAR){
-      if (ncounter<5)
-	ncounter+=1;
-      else{
-	ncounter+=1;
-	estat=Data;
-      }
-    }
-    else{
-      scounter+=1;
-      estat=Isitsilence;
-    }
-    break;
-  case Data:
-    estataux=true;
-    serial_put('1');
-    data_blocks+=1;
-    scounter=0;
-    PORTB |= _BV(PORTB5);
-    if (power<LLINDAR){
-      scounter=1;
-      estat=Isitsilence;
-    }
-    else{
-      ncounter+=1;
-      //printf("el counter val: %d\n", counter);
-    }
-    break;
-  case Isitsilence:
-    serial_put('-');
-    if (power<LLINDAR){
-      if (scounter<5)
-	scounter+=1;
-      else{
-	scounter+=1;
-	estat=Silence;
-      }
-    }
-    else{
-      ncounter=1;
-      estat=Isitdata;
-    }
-    break;
-    }
+
 }
   
 
 int main(void){
   stdout = &mystdout;
   app_init();
-  uint8_t blockcount=0;
-  while(true){
-    switch(state) {
-    case Pause:
-      if (estataux==true){
-	if (ncounter>=VALIDBLOCK)
-	  state=Block;
+  int aux_counter=0;
+  if (flag_int){
+    switch(estat){
+    case Silence:
+      serial_put('0');
+      PORTB &= ~_BV(PORTB5);
+      scounter+=1;
+      if (power2>LLINDAR){
+	aux_counter=1;
+	estat=Isitdata;
+      }
+      break;
+    case Isitdata:
+      serial_put('+');
+      scounter+=1;
+      if (power2>LLINDAR){
+	if (aux_counter<5)
+	  aux_counter+=1;
+	else{
+	  flag_silenci=false;
+	  flag_data=true;
+	  estat=Data;
+	  aux_counter=0;
+	  ncounter=0;
+	}
       }
       else{
-	if (scounter>=LONGPAUSE)
-	  state=Action;
+	estat=Silence;
+	aux_counter=0;
       }
       break;
-    case Block:
-      blockcount+=1;
-	if (scounter>=SHORTPAUSE)
-	  state=Pause;
+    case Data:
+      serial_put('1');
+      ncounter+=1;
+      PORTB |= _BV(PORTB5);
+      if (power2<LLINDAR){
+	aux_counter=1;
+	estat=Isitsilence;
+      }
       break;
-    case Action:
-      switch(blockcount) {
-      case 1:
-	//OK
-	PORTD |= _BV(PORTD5);
-	break;
-      case 2:
-	//Llanterna
-	PORTD |= _BV(PORTD6);
-	break;
-      case 3:
-	//Radio
-	PORTD |= _BV(PORTD7);
-	break;
-      default:
-	//SOS
-	break;
-	blockcount=0;
-	state=Pause;
+    case Isitsilence:
+      serial_put('-');
+      ncounter+=1;
+      if (power2<LLINDAR){
+	if (aux_counter<5)
+	  aux_counter+=1;
+	else{
+	  flag_silenci=true;
+	  flag_data=false;
+	  estat=Silence;
+	  scounter=0;
+	  aux_counter=0;
+	}
+      }
+      else{
+	estat=Data;
       }
       break;
     }
-  } 
+    flag_int=false;
+  }
   return 0;
 }
 
@@ -188,7 +153,8 @@ ISR(TIMER0_COMPA_vect){
   power+=(input*input);
   if (index==MIDA){
     //printf("%ld\n", power);
-    canvi_estat();
+    power2=power;
+    flag_int=true;
     index=0;
     power=0;
   }
