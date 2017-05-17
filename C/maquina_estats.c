@@ -18,6 +18,7 @@
 #define TS2 160
 #define TD1 80
 #define TD2 160
+#define PTTCONF 1600
 
 typedef enum { //Estat de la maquina detectora de senyal
   Data,
@@ -26,17 +27,23 @@ typedef enum { //Estat de la maquina detectora de senyal
   Isitsilence,
 } machine_state_t;
 
-typedef enum { //Estat de la maquina detectora de senyal
+typedef enum { //Estat de la maquina de blocks
   Inicial,
   Primersilenci,
   Block,
   Segonsilenci
 } state_t;
 
-typedef enum { //Estat de la maquina detectora de senyal
+typedef enum { //Estat de les maquines d'accio
   ON,
   OFF
 } state3_t;
+
+typedef enum { //Estat de la maquina PTT
+  ONN,
+  CONFIRM,
+  OFFF
+} state33_t;
 
 static const uint8_t ocr0a=249; //per fer F_m=8kHz, T_m=125us
 uint8_t input=0; //valor llegit despres de l'ADC
@@ -50,7 +57,10 @@ bool flag_data=false;
 
 machine_state_t estat=Silence;
 state_t estat2=Inicial;
-state3_t estat3=OFF;
+state3_t estat31=OFF;
+state3_t estat32=OFF;
+state33_t estat33=OFF;
+state3_t estat34=OFF;
 
 static int uart_putchar(char c, FILE *stream);
 static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL,_FDEV_SETUP_WRITE);
@@ -63,7 +73,7 @@ static int uart_putchar(char c, FILE *stream){
 }
 
 static void app_init(){ //inicialitzacio de variables
-  setup_ADC(0,5,16);//(adc_input,v_ref,adc_pre)
+  setup_ADC(5,5,16);//(adc_input,v_ref,adc_pre)
   //adc_input (0-5 (default=5),8 Tª, 14 1.1V, 15 GND 
   //v_ref 0 (AREF), 1(1.1V), default=5 (5V)
   //adc_pre 2,4,8,16(default),32,64,128
@@ -71,11 +81,11 @@ static void app_init(){ //inicialitzacio de variables
   serial_init();
   sei();
   DDRB |= _BV(DDB5);//pin 13 com a sortida per debuggar amb LED
-  DDRD |=(1<<DDD4);//pin 4 com a sortida per flag de debuggeig
+  DDRD |=(1<<DDD4);//pin 4 com a sortida
   DDRD |=(1<<DDD5);
   DDRD |=(1<<DDD6);
   DDRD |=(1<<DDD7);
-
+  DDRC |=(1<<DDC2);
 }
   
 
@@ -85,7 +95,9 @@ int main(void){
   uint8_t aux_counter=0;
   uint8_t ts=0; //controla temps a la maquina2
   uint8_t td=0; //controla temps a la maquina2
-  bool flag_pols=false;
+  uint8_t pok=0; //nombre de polsos valids
+  bool flag_accio=false;
+  uint16_t conf_temp=0; //temps per confirmar PTT
   while(true){
     /*
       /MAQUINA 1:
@@ -146,81 +158,149 @@ int main(void){
       }
       /*
 	/MAQUINA 2:
-      */
+      */     
       switch(estat2){
       case Inicial:
+	serial_put('I');
 	if(flag_silenci){
 	  estat2=Primersilenci;
-	  serial_put('a');
 	  ts=0;
 	}
 	break;
       case Primersilenci:
-	flag_pols=false;
+	serial_put('1');
 	ts+=1;
+	flag_accio=false;
+	pok=0;
 	if(flag_data){
 	  if(ts>TS1){
 	    estat2=Block;
-	    serial_put('B');
 	    td=0;
 	  } 
 	  else{
 	    estat2=Inicial;
-	    serial_put('I');
 	  }
 	}
 	break;
       case Block:
+	serial_put('B');
 	td+=1;
 	if(td>TD2){
 	  estat2=Inicial;
-	  serial_put('I');
 	}
 	else{
 	  if(flag_silenci){
 	    ts=0;
 	    if(td>TD1){
 	      estat2=Segonsilenci;
-	      serial_put('2');
 	    }
 	    else{
 	      estat2=Primersilenci;
-	      serial_put('b');
 	    }
 	  }
 	}
 	break;
       case Segonsilenci:
 	ts+=1;
+	serial_put('2');
 	if(ts>TS2){
+	  pok+=1;
 	  estat2=Primersilenci;
-	  serial_put('c');
-	  ts=0;
 	  //ACCIO!!
-	  flag_pols=true;
+	  flag_accio=true;
 	}
 	else{
 	  if(flag_data){
-	    estat2=Inicial;
-	    serial_put('I');
+	    if(ts>TS1){
+	      pok+=1;
+	      td=0;
+	      estat2=Block;
+	      //POLS VALID!!
+	    }
+	    else{
+	      //POLS INVALID
+	      estat2=Inicial;
+	    }
 	  }
 	}
 	break;
       }
       /*
-	/MAQUINA 3:
+	/MAQUINA 3.1: OK
       */
-      switch(estat3){
+      switch(estat31){
       case ON:
-	if(flag_pols){
-	  estat3=OFF;
-	  PORTB |= _BV(PORTB5);
+	if(flag_accio && pok==1){
+	  estat31=OFF;
+	  PORTD |= _BV(PORTD6);
 	}
 	break;
-	case OFF:
-	if(flag_pols){
-	  estat3=ON;
-	  PORTB &= ~_BV(PORTB5);
+      case OFF:
+	if(flag_accio && pok==1){
+	  estat31=ON;
+	  PORTD &= ~_BV(PORTD6);
+	}
+	break;
+      }
+      /*
+	/MAQUINA 3.2: LED
+      */
+      switch(estat32){
+      case ON:
+	if(flag_accio && pok==2){
+	  estat32=OFF;
+	  PORTD |= _BV(PORTD5);
+	}
+	break;
+      case OFF:
+	if(flag_accio && pok==2){
+	  estat32=ON;
+	  PORTD &= ~_BV(PORTD5);
+	}
+	break;
+      }
+      /*
+	/MAQUINA 3.3: PTT
+      */
+      switch(estat33){
+      case ONN:
+	if(flag_accio && pok==3){
+	  estat33=OFFF;
+	  PORTD |= _BV(PORTD7);
+	}
+	break;
+      case CONFIRM:
+	conf_temp+=1;
+	if(conf_temp>PTTCONF){
+	  estat33=OFFF;
+	}
+	else{
+	  if(flag_accio && pok==3){
+	    estat33=ONN;
+	    PORTD &= ~_BV(PORTD7);
+	  }
+	}
+	break;
+      case OFFF:
+	if(flag_accio && pok==3){
+	  estat33=CONFIRM;
+	}
+	break;
+      }
+      /*
+	/MAQUINA 3.4: SOS
+      */
+      switch(estat34){
+      case ON:
+	if(flag_accio && pok>3){
+	  estat34=OFF;
+	  PORTC |= _BV(PORTC2);
+	}
+	break;
+      case OFF:
+	if(flag_accio && pok>3){
+	  estat34=ON;
+	  PORTC &= ~_BV(PORTC2);
 	}
 	break;
       }
