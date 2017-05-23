@@ -14,10 +14,10 @@
 #define MIDA 50 
 #define CONTINUA 128
 #define LLINDAR 28000//28000
-#define TS1 80 //80 mostres de silenci = 500ms de silenci
-#define TS2 160
-#define TD1 80
-#define TD2 160
+#define TS1 20 //80 mostres de silenci = 500ms de silenci
+#define TS2 100
+#define TD1 20
+#define TD2 80
 #define PTTCONF 1600
 
 typedef enum { //Estat de la maquina detectora de senyal
@@ -59,7 +59,7 @@ machine_state_t estat=Silence;
 state_t estat2=Primersilenci;
 state3_t estat31=OFF;
 state3_t estat32=OFF;
-state33_t estat33=OFF;
+state33_t estat33=OFFF;
 state3_t estat34=OFF;
 
 static int uart_putchar(char c, FILE *stream);
@@ -86,6 +86,7 @@ static void app_init(){ //inicialitzacio de variables
   DDRD |=(1<<DDD6);
   DDRD |=(1<<DDD7);
   DDRC |=(1<<DDC2);
+  DDRC |=(1<<DDC3);
 }
   
 
@@ -118,6 +119,7 @@ int main(void){
 	  else{
 	    flag_data=true;
 	    estat=Data;
+	    PORTC |= _BV(PORTC3);
 	    aux_counter=0;
 	  }
 	}
@@ -140,6 +142,7 @@ int main(void){
 	  else{
 	    flag_silenci=true;
 	    estat=Silence;
+	    PORTC &= ~_BV(PORTC3);
 	    aux_counter=0;
 	  }
 	}
@@ -155,48 +158,57 @@ int main(void){
       case Inicial:
 	if(flag_silenci){
 	  estat2=Primersilenci;
-	  //serial_put('1');
+	  serial_put('1');
 	  ts=0;
 	}
 	break;
       case Primersilenci:
 	//	printf(" %d ",ts);
-	//ts+=1;
-	flag_accio=false;
-	pok=0;
-	if(flag_data){
-	  /*
-	  if(ts>TS1){
-	    estat2=Block;
-	    serial_put('B');
-	    td=0;
-	  } 
-	  else{
+	if(ts<20){
+	  ts+=1;
+	  if(flag_data){
 	    estat2=Inicial;
 	    serial_put('i');
 	  }
-	  */
-	  estat2=Block;
-	  //serial_put('B');
-	  td=0;
+	}
+	else{
+	  ts+=1;
+	  flag_accio=false;
+	  pok=0;
+	  if(flag_data){
+	    /*
+	      if(ts>TS1){
+	      estat2=Block;
+	      serial_put('B');
+	      td=0;
+	      } 
+	      else{
+	      estat2=Inicial;
+	      serial_put('i');
+	      }
+	    */
+	    estat2=Block;
+	    serial_put('B');
+	    td=0;
+	  }
 	}
 	break;
       case Block:
 	td+=1;
 	if(td>TD2){
 	  estat2=Inicial;
-	  //serial_put('i');
+	  serial_put('i');
 	}
 	else{
 	  if(flag_silenci){
 	    ts=0;
 	    if(td>TD1){
 	      estat2=Segonsilenci;
-	      // serial_put('2');
+	      serial_put('2');
 	    }
 	    else{
 	      estat2=Primersilenci;
-	      //serial_put('1');
+	      serial_put('1');
 	    }
 	  }
 	}
@@ -206,7 +218,7 @@ int main(void){
 	if(ts>TS2){
 	  pok+=1;
 	  estat2=Primersilenci;
-	  //serial_put('1');
+	  serial_put('1');
 	  //ACCIO!!
 	  flag_accio=true;
 	}
@@ -216,13 +228,13 @@ int main(void){
 	      pok+=1;
 	      td=0;
 	      estat2=Block;
-	      // serial_put('B');
+	      serial_put('B');
 	      //POLS VALID!!
 	    }
 	    else{
 	      //POLS INVALID
 	      estat2=Inicial;
-	      // serial_put('i');
+	      serial_put('i');
 	    }
 	  }
 	}
@@ -267,14 +279,12 @@ int main(void){
       */
       switch(estat33){
       case ONN:
-	serial_put('O');
 	if(flag_accio && pok==3){
 	  estat33=OFFF;
 	  PORTD &= ~_BV(PORTD7);
 	}
 	break;
       case CONFIRM:
-	serial_put('C');
 	conf_temp+=1;
 	if(conf_temp>PTTCONF){
 	  estat33=OFFF;
@@ -287,7 +297,6 @@ int main(void){
 	}
 	break;
       case OFFF:
-	serial_put('F');
 	if(flag_accio && pok==3){
 	  estat33=CONFIRM;
 	  conf_temp=0;
