@@ -3,13 +3,17 @@
 
 clear,clc, close 'all',
 
-for test=[0];
+for test=[0 1 2 2 3];
 
   switch test
     case 0,tone=[' 1 '];
 	 t_p=750;t_t=750;leng=zeros(size(tone));leng(:)=t_t;leng(tone==" ")=t_p;leng=leng*1e-3;An=0;Ab=0;Ar=0;Ad=0;amp=(1-An/2-Ab-Ar-Ad)/2;
-    case 1,tone=['    111    1111111    111     '];
-	 t_p=100;t_t=100;leng=zeros(size(tone));leng(:)=t_t;leng(tone==" ")=t_p;leng=leng*1e-3;An=0;Ab=0;Ar=0;Ad=0;amp=(1-An/2-Ab-Ar-Ad)/2;
+    case 1,tone=[' 1 1 '];
+	 t_p=750;t_t=750;leng=zeros(size(tone));leng(:)=t_t;leng(tone==" ")=t_p;leng=leng*1e-3;An=0;Ab=0;Ar=0;Ad=0;amp=(1-An/2-Ab-Ar-Ad)/2;
+    case 2,tone=[' 1 1 1 '];
+	 t_p=750;t_t=750;leng=zeros(size(tone));leng(:)=t_t;leng(tone==" ")=t_p;leng=leng*1e-3;An=0;Ab=0;Ar=0;Ad=0;amp=(1-An/2-Ab-Ar-Ad)/2;
+    case 3,tone=[' 1 1 1 1 '];
+	 t_p=750;t_t=750;leng=zeros(size(tone));leng(:)=t_t;leng(tone==" ")=t_p;leng=leng*1e-3;An=0;Ab=0;Ar=0;Ad=0;amp=(1-An/2-Ab-Ar-Ad)/2;
   end
 
 % show parameters

@@ -56,7 +56,7 @@ bool flag_silenci=false;
 bool flag_data=false;
 
 machine_state_t estat=Silence;
-state_t estat2=Inicial;
+state_t estat2=Primersilenci;
 state3_t estat31=OFF;
 state3_t estat32=OFF;
 state33_t estat33=OFF;
@@ -105,8 +105,6 @@ int main(void){
     if (flag_int){
       switch(estat){
       case Silence:
-	//serial_put('0');
-	//PORTB &= ~_BV(PORTB5);
 	flag_silenci=false;
 	if (power2>LLINDAR){
 	  aux_counter=1;
@@ -114,12 +112,10 @@ int main(void){
 	}
 	break;
       case Isitdata:
-	//serial_put('+');
 	if (power2>LLINDAR){
 	  if (aux_counter<5)
 	    aux_counter+=1;
 	  else{
-	    //serial_put('1');
 	    flag_data=true;
 	    estat=Data;
 	    aux_counter=0;
@@ -131,8 +127,6 @@ int main(void){
 	}
 	break;
       case Data:
-	//serial_put('1');
-	//PORTB |= _BV(PORTB5);
 	flag_data=false;
 	if (power2<LLINDAR){
 	  aux_counter=1;
@@ -140,12 +134,10 @@ int main(void){
 	}
 	break;
       case Isitsilence:
-	//serial_put('-');
 	if (power2<LLINDAR){
 	  if (aux_counter<5)
 	    aux_counter+=1;
 	  else{
-	    //serial_put('0');
 	    flag_silenci=true;
 	    estat=Silence;
 	    aux_counter=0;
@@ -161,51 +153,60 @@ int main(void){
       */     
       switch(estat2){
       case Inicial:
-	serial_put('I');
 	if(flag_silenci){
 	  estat2=Primersilenci;
+	  //serial_put('1');
 	  ts=0;
 	}
 	break;
       case Primersilenci:
-	serial_put('1');
-	ts+=1;
+	//	printf(" %d ",ts);
+	//ts+=1;
 	flag_accio=false;
 	pok=0;
 	if(flag_data){
+	  /*
 	  if(ts>TS1){
 	    estat2=Block;
+	    serial_put('B');
 	    td=0;
 	  } 
 	  else{
 	    estat2=Inicial;
+	    serial_put('i');
 	  }
+	  */
+	  estat2=Block;
+	  //serial_put('B');
+	  td=0;
 	}
 	break;
       case Block:
-	serial_put('B');
 	td+=1;
 	if(td>TD2){
 	  estat2=Inicial;
+	  //serial_put('i');
 	}
 	else{
 	  if(flag_silenci){
 	    ts=0;
 	    if(td>TD1){
 	      estat2=Segonsilenci;
+	      // serial_put('2');
 	    }
 	    else{
 	      estat2=Primersilenci;
+	      //serial_put('1');
 	    }
 	  }
 	}
 	break;
       case Segonsilenci:
 	ts+=1;
-	serial_put('2');
 	if(ts>TS2){
 	  pok+=1;
 	  estat2=Primersilenci;
+	  //serial_put('1');
 	  //ACCIO!!
 	  flag_accio=true;
 	}
@@ -215,11 +216,13 @@ int main(void){
 	      pok+=1;
 	      td=0;
 	      estat2=Block;
+	      // serial_put('B');
 	      //POLS VALID!!
 	    }
 	    else{
 	      //POLS INVALID
 	      estat2=Inicial;
+	      // serial_put('i');
 	    }
 	  }
 	}
@@ -232,13 +235,13 @@ int main(void){
       case ON:
 	if(flag_accio && pok==1){
 	  estat31=OFF;
-	  PORTD |= _BV(PORTD6);
+	  PORTD &= ~_BV(PORTD5);
 	}
 	break;
       case OFF:
 	if(flag_accio && pok==1){
 	  estat31=ON;
-	  PORTD &= ~_BV(PORTD6);
+	  PORTD |= _BV(PORTD5);
 	}
 	break;
       }
@@ -249,13 +252,13 @@ int main(void){
       case ON:
 	if(flag_accio && pok==2){
 	  estat32=OFF;
-	  PORTD |= _BV(PORTD5);
+	  PORTD &= ~_BV(PORTD6);
 	}
 	break;
       case OFF:
 	if(flag_accio && pok==2){
 	  estat32=ON;
-	  PORTD &= ~_BV(PORTD5);
+	  PORTD |= _BV(PORTD6);
 	}
 	break;
       }
@@ -264,12 +267,14 @@ int main(void){
       */
       switch(estat33){
       case ONN:
+	serial_put('O');
 	if(flag_accio && pok==3){
 	  estat33=OFFF;
-	  PORTD |= _BV(PORTD7);
+	  PORTD &= ~_BV(PORTD7);
 	}
 	break;
       case CONFIRM:
+	serial_put('C');
 	conf_temp+=1;
 	if(conf_temp>PTTCONF){
 	  estat33=OFFF;
@@ -277,13 +282,15 @@ int main(void){
 	else{
 	  if(flag_accio && pok==3){
 	    estat33=ONN;
-	    PORTD &= ~_BV(PORTD7);
+	    PORTD |= _BV(PORTD7);
 	  }
 	}
 	break;
       case OFFF:
+	serial_put('F');
 	if(flag_accio && pok==3){
 	  estat33=CONFIRM;
+	  conf_temp=0;
 	}
 	break;
       }
@@ -294,13 +301,13 @@ int main(void){
       case ON:
 	if(flag_accio && pok>3){
 	  estat34=OFF;
-	  PORTC |= _BV(PORTC2);
+	  PORTC &= ~_BV(PORTC2);
 	}
 	break;
       case OFF:
 	if(flag_accio && pok>3){
 	  estat34=ON;
-	  PORTC &= ~_BV(PORTC2);
+	  PORTC |= _BV(PORTC2);
 	}
 	break;
       }
