@@ -12,13 +12,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define MIDA 50 
-#define CONTINUA 128
-#define LLINDAR 28000//28000
+#define CONTINUA 128//128+7
+#define LLINDAR 5000//28000
 #define TS1 20 //80 mostres de silenci = 500ms de silenci
 #define TS2 100
 #define TD1 20
 #define TD2 80
 #define PTTCONF 1600
+#define HISTERESI 5
 
 typedef enum { //Estat de la maquina detectora de senyal
   Data,
@@ -46,7 +47,7 @@ typedef enum { //Estat de la maquina PTT
 } state33_t;
 
 static const uint8_t ocr0a=249; //per fer F_m=8kHz, T_m=125us
-uint8_t input=0; //valor llegit despres de l'ADC
+//uint16_t input=0; //valor llegit despres de l'ADC
 uint8_t segment[MIDA]; // mida de la finestra. Ultimes 50 mostres ->6.25ms
 volatile int32_t power=0; //potencia
 volatile int32_t power2=0; //copia de la potencia
@@ -114,7 +115,7 @@ int main(void){
 	break;
       case Isitdata:
 	if (power2>LLINDAR){
-	  if (aux_counter<5)
+	  if (aux_counter<HISTERESI)
 	    aux_counter+=1;
 	  else{
 	    flag_data=true;
@@ -137,7 +138,7 @@ int main(void){
 	break;
       case Isitsilence:
 	if (power2<LLINDAR){
-	  if (aux_counter<5)
+	  if (aux_counter<HISTERESI)
 	    aux_counter+=1;
 	  else{
 	    flag_silenci=true;
@@ -329,8 +330,9 @@ int main(void){
 ISR(TIMER0_COMPA_vect){
   PORTD |= (1<<PD4);
   int8_t input=read8_ADC()-CONTINUA;  //pot donar problemes amb continua diferent de 127 -> solucio int16_t
-  //int16_t input=(int16_t)read8_ADC()-CONTINUA; //alternativa
+  //  int16_t input=(int16_t)read8_ADC()-CONTINUA; //alternativa
   start_ADC();
+  //printf("%d ", input);
   index+=1;
   power+=(input*input);
   if (index==MIDA){
