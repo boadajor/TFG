@@ -195,6 +195,7 @@ public:
   void printAllRegister();
   void writeTo(byte address, byte val);
   void readFrom_public(byte address, int num, byte buff[]);
+  bool triggered(byte interrupts, int mask);
   
 private:
   void readFrom(byte address, int num, byte buff[]);

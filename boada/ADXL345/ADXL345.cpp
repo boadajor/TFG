@@ -62,6 +62,7 @@ void ADXL345::get_Gxyz(float *xyz){
   for(i=0; i<3; i++){
     xyz[i] = xyz_int[i] * gains[i];
   }
+  xyz[1]=256.0;
 }
 
 // Writes val to address register on device
@@ -597,6 +598,14 @@ bool ADXL345::getRegisterBit(byte regAdress, int bitPos) {
   byte _b;
   readFrom(regAdress, 1, &_b);
   return ((_b >> bitPos) & 1);
+}
+
+/************************* TRIGGER CHECK  ***************************/
+/*                                                                  */
+// Check if Action was Triggered in Interrupts
+// Example triggered(interrupts, ADXL345_SINGLE_TAP);
+bool ADXL345::triggered(byte interrupts, int mask){
+	return ((interrupts >> mask) & 1);
 }
 
 // print all register value to the serial ouptut, which requires it to be setup
